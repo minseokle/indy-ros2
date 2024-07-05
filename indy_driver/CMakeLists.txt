@@ -19,19 +19,6 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_python REQUIRED)
 
-# uncomment the following section in order to fill in
-# further dependencies manually.
-# find_package(<dependency> REQUIRED)
-# install(DIRECTORY
-#   src
-#   DESTINATION share/${PROJECT_NAME}/
-# )
-
-install(DIRECTORY
-  gRPC
-  DESTINATION lib/${PROJECT_NAME}
-)
-
 install(DIRECTORY
   launch controller
   DESTINATION share/${PROJECT_NAME}/
@@ -39,6 +26,9 @@ install(DIRECTORY
 
 install(PROGRAMS
   ${PROJECT_NAME}/indy_driver.py
+  ${PROJECT_NAME}/servo_joy_input.py
+  ${PROJECT_NAME}/servo_keyboard_input.py
+  ${PROJECT_NAME}/indy_define.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

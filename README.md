@@ -14,7 +14,10 @@ This repository contains ROS2 drivers for Indy7, Indy7V2, IndyRP2, IndyRP2V2 and
 
 The following software needs to be installed:
 - [ROS2 Humble](https://docs.ros.org/en/humble/Installation.html)
-
+- indyDCP3
+    ```
+    pip3 install neuromeka==3.2.0.3
+    ```
 
 ## Installation
 
@@ -52,28 +55,10 @@ ros-humble-moveit-visual-tools \
 ros-humble-moveit-resources
 ```
 
-
-#### Switch to Cyclone DDS
-
-sudo apt install ros-humble-rmw-cyclonedds-cpp
-
-**Add this to ~/.bashrc to source it automatically**
-
-export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-
-
-### Create a workspace and download the source code
+### Download the source code and build
 
 ```
-cd ~
-mkdir -p indy_ros2/src
-cd ~/indy_ros2/src
 git clone <this repository url>
-```
-
-### Build Indy driver
-
-```
 cd ~/indy_ros2/
 colcon build
 ```
@@ -93,28 +78,27 @@ If not specified, the default value will be indy7.
 
 When used with a real robot, you need to provide an **indy_ip** value.
 
-**In servoing mode:**
-Using Dpad to control joint 2 and joint 4.
-B and X control joint 6
-Y and A control joint 5
-Left joystick, right joystick, LB, RB, LT, RT to control TCP.
+**Servoing mode with Joy Controller (tested with XBOX ONE S gamepad)**\
+Using Dpad to control joint 1 and joint 2.\
+B and X control joint 4\
+Y and A control joint 3\
+Left joystick, right joystick, LB, RB, LT, RT to control TCP.\
+*On Real Robot*\
+Use 'LEFT_STICK_CLICK' to move Home, 'RIGHT_STICK_CLICK' to move Zero, 'XBOX' to Recover, 'HOME' to Start/Stop Teleop
 
-### IndyROSCommTask
 
-IndyROSCommTask will run on a real robot and create communication with ROS PC.
-To use IndyROSCommTask, we need to install gRPC on the computer that installed ROS:
+**Servoing mode with Keyboard**\
+*Common Use*\
+Use arrow keys and the '.' and ';' keys to Cartesian jog\
+Use 'W' to Cartesian jog in the world frame, and 'E' for the End-Effector frame\
+Use 'N' 'M' ',' for the Task move UVW\
+Use 1|2|3|4|5|6|7 keys to joint jog. 'R' to reverse the direction of jogging.\
+Use '-' '+' to adjust joint speed\
+Use '9' '0' to adjust task speed\
+'Q' to quit.\
+*On Real Robot*\
+Use 'H' to move Home, 'Z' to move Zero, 'S' to Recover, 'P' to stop Teleop\
 
-```
-sudo pip3 install grpcio==1.43.0
-sudo pip3 install grpcio-tools==1.43.0
-```
-
-Copy IndyROSCommTask to STEP PC and run the following commands:
-
-```
-sudo chmod +x IndyROSCommTask
-sudo ./IndyROSCommTask
-```
 
 ### Start Indy description
 
@@ -127,46 +111,58 @@ ros2 launch indy_description indy_display.launch.py indy_type:=indy7
 
 ### Simulation Robot
 
-#### Start Indy Gazebo Robot
+**Start Indy Robot**
 
 ```
 ros2 launch indy_gazebo indy_gazebo.launch.py indy_type:=indy7
 ```
 
-#### Start Indy Gazebo with Moveit
-
-If use moveit 
+**Start Indy with MoveIt**
 
 ```
 ros2 launch indy_moveit indy_moveit_gazebo.launch.py indy_type:=indy7
 ```
 
-If use servoing 
+**Start Indy with Servoing**
 
 ```
 ros2 launch indy_moveit indy_moveit_gazebo.launch.py indy_type:=indy7 servo_mode:=true
 ```
 
+Start keyboard or controller
+
+```
+ros2 run indy_driver servo_keyboard_input.py --ros-args -p is_sim:=true
+```
+```
+ros2 run indy_driver servo_joy_input.py --ros-args -p is_sim:=true
+```
 
 ### Real Robot
 
-#### Start Indy Robot
+**Start Indy Robot**
 
 ```
 ros2 launch indy_driver indy_bringup.launch.py indy_type:=indy7 indy_ip:=192.168.xxx.xxx
 ```
 
-#### Start Indy with Moveit
-
-If use moveit 
+**Start Indy with MoveIt**
 
 ```
 ros2 launch indy_moveit indy_moveit_real_robot.launch.py indy_type:=indy7 indy_ip:=192.168.xxx.xxx
 ```
 
-If use servoing 
+**Start Indy with Servoing**
 
 ```
 ros2 launch indy_moveit indy_moveit_real_robot.launch.py indy_type:=indy7 indy_ip:=192.168.xxx.xxx servo_mode:=true
 ```
 
+Start keyboard or controller
+
+```
+ros2 run indy_driver servo_keyboard_input.py --ros-args -p is_sim:=false
+```
+```
+ros2 run indy_driver servo_joy_input.py --ros-args -p is_sim:=false
+```

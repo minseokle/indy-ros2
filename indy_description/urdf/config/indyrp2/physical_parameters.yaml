@@ -7,7 +7,7 @@ inertia_parameters:
   link5_mass: 2.12987371 
   link6_mass: 2.22412271
   link7_mass: 0.38254932
-#
+  
   link0:
     ixx: 0.00661309
     iyy: 0.00644765

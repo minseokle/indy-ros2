@@ -169,21 +169,10 @@ def launch_setup(context, *args, **kwargs):
         executable="component_container",
         composable_node_descriptions=[
             # ComposableNode(
-            #     package="moveit_servo",
-            #     plugin="moveit_servo::ServoServer",
-            #     name="servo_server",
-            #     parameters=[
-            #         servo_params,
-            #         robot_description,
-            #         robot_description_semantic,
-            #     ],
-            #     # extra_arguments=[{"use_intra_process_comms": True}],
+            #     package="indy_moveit",
+            #     plugin="moveit_servo::JoyToServoPub",
+            #     name="controller_to_servo_node",
             # ),
-            ComposableNode(
-                package="indy_moveit",
-                plugin="moveit_servo::JoyToServoPub",
-                name="controller_to_servo_node",
-            ),
             ComposableNode(
                 package="joy",
                 plugin="joy::Joy",
@@ -199,6 +188,7 @@ def launch_setup(context, *args, **kwargs):
 
     if servo_mode.perform(context) == 'true':        
         nodes_to_start = [servo_node, container, rviz_node]
+        # nodes_to_start = [servo_node, rviz_node]
     else:
         nodes_to_start = [move_group_node, rviz_node]
 

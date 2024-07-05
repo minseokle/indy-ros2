@@ -4,6 +4,7 @@
 import json
 import math
 import time
+from neuromeka import IndyDCP3 
 
 import rclpy
 from rclpy.node import Node
@@ -11,17 +12,15 @@ from rclpy.action import ActionServer, CancelResponse, GoalResponse
 
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy
-from rclpy.callback_groups import ReentrantCallbackGroup
+# from rclpy.callback_groups import ReentrantCallbackGroup
 
-from std_msgs.msg import String
+# from std_msgs.msg import String
 from sensor_msgs.msg import JointState
 from control_msgs.action import FollowJointTrajectory
 from trajectory_msgs.msg import JointTrajectoryPoint, JointTrajectory
 
-import grpc
-from gRPC import ros_interface_pb2 as IndyRosInterface
-from gRPC import ros_interface_pb2_grpc as IndyRosInterface_grpc
-
+from indy_interfaces.srv import IndyService
+from indy_define import *
 
 def rads2degs(rad_list):
     degs = [math.degrees(rad) for rad in rad_list]
@@ -31,7 +30,6 @@ def degs2rads(deg_list):
     rads = [math.radians(deg) for deg in deg_list]
     return rads
 
-
 class IndyROSConnector(Node):
 
     PUBLISH_RATE = 20 # Hz
@@ -40,11 +38,10 @@ class IndyROSConnector(Node):
         super().__init__('indy_driver')
         qos_profile = QoSProfile(
             depth=10,
-            reliability=QoSReliabilityPolicy.RMW_QOS_POLICY_RELIABILITY_RELIABLE
+            reliability=QoSReliabilityPolicy.RELIABLE
         )
 
         # Initialize joint control servers
-
         self.jtc_action_server = ActionServer(
             self,
             FollowJointTrajectory,
@@ -65,23 +62,23 @@ class IndyROSConnector(Node):
         # Initialize topics
         self.timer = self.create_timer(1/self.PUBLISH_RATE, self.timer_callback)
         self.joint_state_pub = self.create_publisher(JointState, 'joint_states', qos_profile)
+        self.indy_srv = self.create_service(IndyService, 'indy_srv', self.indy_srv_callback)
 
         # Initialize parameters  with default values
         self.declare_parameter('indy_ip', "127.0.0.1")
         self.declare_parameter('indy_type', "indy7")
+        self.indy = None
         self.indy_ip = None
         self.indy_type = None
+        self.indy_msg_status = MSG_TELE_STOP
 
         # Initialize variable
-        self.vel = 3 # level 1 -> 3
-        self.blend = 0.2 # rad 0 -> 0.4
+        # self.vel = 3 # level 1 -> 3
+        # self.blend = 0.2 # rad 0 -> 0.4
         self.joint_state_list = []
         self.joint_state_feedback = JointTrajectoryPoint()
         self.execute = False
         self.previous_joint_trajectory_sub = None
-
-        self.grpc_channel = None
-        self.grpc_stub = None
 
         print("Indy connector has been initialised.")
 
@@ -101,42 +98,105 @@ class IndyROSConnector(Node):
         self.indy_type = self.get_parameter('indy_type').get_parameter_value().string_value
         print("ROBOT IP: ", self.indy_ip)
         print("ROBOT TYPE: ", self.indy_type)
-
-        self.grpc_channel = grpc.insecure_channel(self.indy_ip + ':50055')
-        self.grpc_stub = IndyRosInterface_grpc.IndyServiceStub(self.grpc_channel)
-
-        self.grpc_stub.SetJointVelocityLevel(IndyRosInterface.JointVelocityLevelReq(vel=self.vel))
-        self.grpc_stub.SetJointBlending(IndyRosInterface.JointBlendingReq(blending_rad=self.blend))
-        # self.grpc_stub.StartTeleMode(IndyRosInterface.Empty())
-        time.sleep(0.3)
+        self.indy = IndyDCP3(self.indy_ip)
 
     # Disconnect to Indy
     def disconnect(self):
         print("DISCONNECT TO ROBOT")
-        self.grpc_stub.StopRobot(IndyRosInterface.Empty())
-        # self.grpc_stub.StopTeleMode(IndyRosInterface.Empty())
-        time.sleep(0.3)
-        self.grpc_channel.close()
-
+        self.indy.stop_teleop()
+        time.sleep(1)
+        self.indy.stop_motion()
+        time.sleep(1)
+        del self.indy 
 
     '''
     Indy subscribe
-    ''' 
-    def joint_trajectory_callback(self, msg):
+    '''
+
+    def indy_srv_callback(self, request, response):                        
+        self.get_logger().info('Incoming request | MODE: %d' % (request.data))
+        self.indy.stop_motion()
+
+        if request.data == MSG_RECOVER:
+            self.indy.stop_teleop()
+            time.sleep(0.3)
+            while self.indy.get_control_data()['op_state'] != OP_IDLE:
+                time.sleep(0.1)
+            self.indy.recover()
+            self.indy_msg_status = request.data
+
+        elif request.data == MSG_MOVE_HOME:
+            self.indy.stop_teleop()
+            time.sleep(0.3)
+            while self.indy.get_control_data()['op_state'] != OP_IDLE:
+                time.sleep(0.1)
+            self.indy.movej(jtarget = self.indy.get_home_pos()['jpos'])
+            time.sleep(0.2)
+            self.indy_msg_status = request.data
+
+            
+        elif request.data == MSG_MOVE_ZERO:
+            self.indy.stop_teleop()
+            time.sleep(0.3)
+            while self.indy.get_control_data()['op_state'] != OP_IDLE:
+                time.sleep(0.1)
+            self.indy.movej(jtarget = [0,0,0,0,0,0])
+            time.sleep(0.2)
+            self.indy_msg_status = request.data
+
+        elif request.data == MSG_TELE_STOP:
+            self.indy.stop_teleop()
+            time.sleep(0.3)
+            while self.indy.get_control_data()['op_state'] != OP_IDLE:
+                time.sleep(0.1)
+            self.indy_msg_status = request.data
+                
+        elif request.data in [MSG_TELE_TASK_ABS, MSG_TELE_TASK_RLT, MSG_TELE_JOINT_ABS, MSG_TELE_JOINT_RLT]:
+            method = TELE_TASK_RELATIVE # default is task
+            if request.data == MSG_TELE_TASK_ABS: # Joint
+                method = TELE_TASK_ABSOLUTE
+            elif request.data == MSG_TELE_JOINT_ABS:
+                method = TELE_JOINT_ABSOLUTE
+            elif request.data == MSG_TELE_JOINT_RLT:
+                method = TELE_JOINT_RELATIVE
+
+            # start teleop
+            self.indy.stop_teleop()
+            time.sleep(0.1)
+            self.indy.start_teleop(method=method) 
+            time.sleep(0.2)
+
+            # wait for telemode actually start
+            cur_time = time.time()
+            timeout = time.time()
+            while self.indy.get_control_data()['op_state'] != TELE_OP:
+                if (time.time() - cur_time) > 0.5:
+                    self.indy.start_teleop(method=method) 
+                    cur_time = time.time()
+                if (time.time() - timeout) > 3:
+                    response.success = False
+                    response.message = "TIMEOUT WHEN TRYING TO START TELEOP!!!"
+                    return response
+                time.sleep(0.2)
+            self.indy_msg_status = request.data
+
+        response.success = True
+        return response
+
+    def joint_trajectory_callback(self, msg): # servoing -> teleop
         joint_state_list = []
         if msg.points:
             joint_state_list = [p.positions for p in msg.points]
         else:
-            self.grpc_stub.StopRobot(IndyRosInterface.Empty())
+            self.indy.stop_motion()
         # print("joint state list: ", joint_state_list) #rad/s rad
         if self.previous_joint_trajectory_sub != joint_state_list[0]:
-            self.grpc_stub.MoveJoint(IndyRosInterface.MoveJointReq(jpos=joint_state_list[0],
-                                    base_type=IndyRosInterface.JOINT_BASE_TYPE_ABSOLUTE))
-            # TODO: in evaluation, do not use TeleMode
-            # self.grpc_stub.SetTeleTarget(IndyRosInterface.SetTeleTargetReq(target_pos=joint_state_list[0]))
+            # if TELE MODE
+            if self.indy_msg_status == MSG_TELE_JOINT_ABS:
+                self.indy.movetelej_abs(jpos=rads2degs(joint_state_list[0]))
+
             self.previous_joint_trajectory_sub = joint_state_list[0]
         
-
     '''
     Indy publish
     '''
@@ -149,10 +209,11 @@ class IndyROSConnector(Node):
             joint_state_msg.name = ['joint0', 'joint1', 'joint2', 'joint3', 'joint4', 'joint5', 'joint6']
         else:
             joint_state_msg.name = ['joint0', 'joint1', 'joint2', 'joint3', 'joint4', 'joint5']
-        joint_state_msg.position = self.grpc_stub.GetJointPos(IndyRosInterface.Empty()).jpos
-        # joint_state_msg.velocity = self.indy.get_joint_vel() TODO
+        
+        control_data = self.indy.get_control_data()
+        joint_state_msg.position = degs2rads(control_data['q'])
+        joint_state_msg.velocity = degs2rads(control_data['qdot'])
         # joint_state_msg.effort = get_control_torque() TODO
-
         self.joint_state_feedback.positions = joint_state_msg.position
         self.joint_state_pub.publish(joint_state_msg)
         
@@ -165,103 +226,94 @@ class IndyROSConnector(Node):
     '''
     def goal_callback(self, goal_request):
         # Accepts or rejects a client request to begin an action
-        self.get_logger().info('Received goal request :)')
+        self.get_logger().info('Received goal request!')
         return GoalResponse.ACCEPT
 
     def cancel_callback(self, goal_handle):
         # Accepts or rejects a client request to cancel an action
-        self.get_logger().info('Received cancel request :(')
+        self.get_logger().info('Received cancel request!')
         return CancelResponse.ACCEPT
 
     async def execute_callback(self, goal_handle):
         print('FollowJointTrajectory callback...')
+
+        result = FollowJointTrajectory.Result()
+        feedback_msg = FollowJointTrajectory.Feedback()
+
+        # check if robot is in ILDE mode
+        if self.indy.get_control_data()['op_state'] != OP_IDLE:
+            result.error_code = FollowJointTrajectory.Result.INVALID_JOINTS
+            result.error_string = "ROBOT IS NOT READY"
+            return result
+
         # last_time = self.get_clock().now()
         goal = goal_handle.request.trajectory.points.copy()
-
+        
         # download planned path from ros moveit
         self.joint_state_list = []
         if goal:
             self.joint_state_list = [p.positions for p in goal]
-        else:
-            self.grpc_stub.StopRobot(IndyRosInterface.Empty())
-
+            
+        is_cancel = False
         # Do something for OP_IDLE state
         if self.joint_state_list:
-
-            #--------------reduce the trajectory points----------
-            new_array = [self.joint_state_list[0]]
-            percentage = 95 # percentage of reduced point
-            number = int(len(self.joint_state_list) * (1 - (percentage/100))) - 2
-            if number > 0:
-                distance = int((len(self.joint_state_list) - 2) / (number + 1))
-                for i in range(1, number + 1):
-                    new_array.append(self.joint_state_list[i * distance])
-            new_array.append(self.joint_state_list[-1])
-            #---------------------------------------------------
-
-            result = FollowJointTrajectory.Result()
-            feedback_msg = FollowJointTrajectory.Feedback()
-
-            current_robot_status = self.grpc_stub.GetRobotState(IndyRosInterface.Empty())
-            error_messages = {
-                IndyRosInterface.OP_MOVING: "ROBOT IS BUSY",
-                IndyRosInterface.OP_RECOVER_SOFT: "ROBOT IS IN RECOVER STATE",
-                IndyRosInterface.OP_COLLISION: "ROBOT IS IN COLLISION STATE",
-                IndyRosInterface.OP_TEACHING: "ROBOT IS IN TEACHING MODE",
-                IndyRosInterface.OP_VIOLATE: "ROBOT IS IN VIOLATION STATE"
-            }
-
-            if current_robot_status.state in error_messages:
-                result.error_code = FollowJointTrajectory.Result.INVALID_JOINTS
-                result.error_string = error_messages[current_robot_status.state]
-                return result
-
-            waypoints = []
-            # desired_position = new_array[-1]
-
-            for j_pos in new_array:
-                waypoints.append(IndyRosInterface.WayPoint(jpos=j_pos, 
-                                base_type=IndyRosInterface.JOINT_BASE_TYPE_ABSOLUTE, 
-                                blending_rad=self.blend))
-            self.grpc_stub.MoveJointWaypoint(IndyRosInterface.MoveJointWaypointReq(way_point=waypoints))
+            #-------------------------------------------------------
+            # start teleop
+            self.indy.stop_teleop()
+            time.sleep(0.1)
+            self.indy.start_teleop(method=TELE_JOINT_ABSOLUTE) 
             time.sleep(0.2)
 
-            while current_robot_status.state != IndyRosInterface.OP_MOVING:
-                current_robot_status = self.grpc_stub.GetRobotState(IndyRosInterface.Empty())
-                self.get_logger().info('Wait for robot start to move...')
-                time.sleep(0.1)
+            # wait for telemode actually start
+            cur_time = time.time()
+            while self.indy.get_control_data()['op_state'] != TELE_OP:
+                if (time.time() - cur_time) > 0.5:
+                    self.indy.start_teleop(method=TELE_JOINT_ABSOLUTE)  
+                    cur_time = time.time()
+                time.sleep(0.2)
 
-            self.get_logger().info('robot is moving...')
-            while current_robot_status.state != IndyRosInterface.OP_IDLE:
+            # send waypoints
+            for j_pos in self.joint_state_list:
+                try:
+                    self.indy.movetelej_abs(jpos=rads2degs(j_pos))
+                except Exception as e:
+                    self.get_logger().error('THERE ARE ISSUE WHEN EXECUTE WAYPOINT, PLEASE TRY AGAIN!')
+                    is_cancel = True
+                    break
 
                 if goal_handle.is_cancel_requested:
-                    self.grpc_stub.StopRobot(IndyRosInterface.Empty())
-                    goal_handle.canceled()
-                    return result
+                    is_cancel = True
+                    break
 
-                # print("self.joint_state_feedback.positions: ", self.joint_state_feedback.positions)
-                feedback_msg.desired.positions = self.joint_state_feedback.positions
+                feedback_msg.desired.positions = rads2degs(j_pos)
                 feedback_msg.actual.positions = self.joint_state_feedback.positions
                 goal_handle.publish_feedback(feedback_msg)
+                time.sleep(0.05) #20Hz
 
-                # self.get_logger().info('robot is moving...')
-                time.sleep(0.1)
-                current_robot_status = self.grpc_stub.GetRobotState(IndyRosInterface.Empty())
+            time.sleep(0.5) # wait for robot stable
 
-        goal_handle.succeed()
-        result.error_code = FollowJointTrajectory.Result.SUCCESSFUL
+            self.indy.stop_teleop()
+            time.sleep(0.3)
+            while self.indy.get_control_data()['op_state'] != OP_IDLE:
+                time.sleep(0.2)
+
+        if is_cancel:
+            goal_handle.canceled()
+        else:                
+            goal_handle.succeed()
+            result.error_code = FollowJointTrajectory.Result.SUCCESSFUL
         return result
 
 
 def main(args=None):
     rclpy.init(args=args)
-
     with IndyROSConnector() as indy_driver:
         executor = MultiThreadedExecutor()
         rclpy.spin(indy_driver, executor=executor)
 
-    rclpy.shutdown()
-
-
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        if rclpy.ok():
+            rclpy.shutdown()

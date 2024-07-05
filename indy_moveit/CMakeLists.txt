@@ -15,8 +15,6 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-set(SERVO_CONTROLLER_INPUT servo_controller_input)
-
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_python REQUIRED)
@@ -38,14 +36,10 @@ install(DIRECTORY
   DESTINATION share/${PROJECT_NAME}/
 )
 
-add_library(${SERVO_CONTROLLER_INPUT} SHARED src/servo_joy_input.cpp)
-ament_target_dependencies(${SERVO_CONTROLLER_INPUT} rclcpp rclcpp_components geometry_msgs control_msgs sensor_msgs moveit_msgs std_srvs)
-rclcpp_components_register_nodes(${SERVO_CONTROLLER_INPUT} "moveit_servo::JoyToServoPub")
 
 # Install Libraries
 install(
  TARGETS
-   ${SERVO_CONTROLLER_INPUT}
  EXPORT export_${PROJECT_NAME}
  LIBRARY DESTINATION lib
  ARCHIVE DESTINATION lib
