@@ -116,6 +116,7 @@
                     upper="${sec_limits[joint_index]['max_position']}"
                     effort="${sec_limits[joint_index]['max_effort']}" 
                     velocity="${sec_limits[joint_index]['max_velocity']}"/>
+                    <!-- acceleration="${sec_limits[joint_index]['max_acceleration']}" -->
             </joint>
         </xacro:macro>
 
@@ -128,7 +129,7 @@
 
         <xacro:if value="${indy_type == 'indyrp2' or indy_type == 'indyrp2_v2'}">
             <xacro:define_joint joint_index="joint6" link_1_index="link6" link_2_index="link7"/>
-            <joint name="${prefix}tcp" type="fixed">
+            <joint name="${prefix}joint_tcp" type="fixed">
                 <parent link="${prefix}link7"/>
                 <child link="${prefix}tcp"/>
                 <origin xyz="0 0 0.06" rpy="0 0 0"/>
@@ -136,7 +137,7 @@
         </xacro:if>
 
         <xacro:unless value="${indy_type == 'indyrp2' or indy_type == 'indyrp2_v2'}">
-            <joint name="${prefix}tcp" type="fixed">
+            <joint name="${prefix}joint_tcp" type="fixed">
                 <parent link="${prefix}link6"/>
                 <child link="${prefix}tcp"/>
                 <origin xyz="0 0 0.06" rpy="0 0 0"/>

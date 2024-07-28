@@ -9,7 +9,6 @@
 
     <!-- possible 'indy_type' values: indy7, indy12, indyrp2...-->
     <xacro:arg name="indy_type" default="indy7"/>
-
     <xacro:arg name="indy_eye" default="false"/>
 
     <!-- parameters -->
@@ -23,7 +22,6 @@
 
     <xacro:arg name="sim_gazebo" default="false" />
     <xacro:arg name="simulation_controllers" default="" />
-
 
     <link name="world" />
 
@@ -47,15 +45,11 @@
     </xacro:indy_robot>
 
     <xacro:if value="$(arg sim_gazebo)">
-        <gazebo reference="world"> </gazebo>
+        <gazebo reference="world"></gazebo>
         <gazebo>
-            <plugin name="gazebo_ros2_control" filename="libgazebo_ros2_control.so" >
-                <parameters>$(arg simulation_controllers)</parameters>
+            <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
+            <parameters>$(arg simulation_controllers)</parameters>
             </plugin>
         </gazebo>
-            <!-- <robot_param>robot_description</robot_param> -->
-            <!-- <robot_param_node>robot_state_publisher</robot_param_node> -->
-            <!-- <parameters>$(find indy_gazebo)/controller/indy_controllers_7dof.yaml</parameters> -->
     </xacro:if>
-    
 </robot>

@@ -3,7 +3,7 @@ from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, Regi
 from launch.event_handlers import OnProcessExit
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import Command, FindExecutable, LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import Command, FindExecutable, LaunchConfiguration, PathJoinSubstitution #, IfElseSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
@@ -17,6 +17,9 @@ def launch_setup(context, *args, **kwargs):
     indy_eye = LaunchConfiguration("indy_eye")
     prefix = LaunchConfiguration("prefix")
     launch_rviz = LaunchConfiguration("launch_rviz")
+
+    # gazebo_gui = LaunchConfiguration("gazebo_gui")
+    # world_file = LaunchConfiguration("world_file")
 
     if (indy_type.perform(context) == 'indyrp2') or (indy_type.perform(context) == 'indyrp2_v2'):
         initial_joint_controllers = PathJoinSubstitution(
@@ -70,27 +73,27 @@ def launch_setup(context, *args, **kwargs):
         arguments=["joint_state_broadcaster", "--controller-manager", "/controller_manager"],
         output="screen",
     )
-
+    
     joint_controller_spawner = Node(
         package="controller_manager",
         executable="spawner",
         arguments=["joint_trajectory_controller", "-c", "/controller_manager"],
     )
 
-    # Gazebo nodes
     gazebo = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
-            [FindPackageShare("gazebo_ros"), "/launch", "/gazebo.launch.py"]
+            [FindPackageShare("ros_gz_sim"), "/launch/gz_sim.launch.py"]
         ),
+        launch_arguments=[('gz_args', [' -r -v 4 empty.sdf'])]
     )
 
-    # Spawn robot
     gazebo_spawn_robot = Node(
-        package="gazebo_ros",
-        executable="spawn_entity.py",
-        name="spawn_indy",
-        arguments=["-entity", "indy", "-topic", "robot_description"],
-        output="screen",
+        package='ros_gz_sim',
+        executable='create',
+        output='screen',
+        arguments=['-string', robot_description_content,
+                   '-name', 'indy',
+                   '-allow_renaming', 'false'],
     )
 
     rviz_node = Node(
@@ -129,19 +132,14 @@ def launch_setup(context, *args, **kwargs):
     nodes_to_start = [
         gazebo,
         gazebo_spawn_robot,
-
         robot_state_publisher_node,
-
         # joint_state_broadcaster_spawner,
         # joint_controller_spawner,
-
         delay_joint_state_broadcaster_spawner,
         delay_robot_controller_spawner,
         delay_rviz2_spawner,
     ]
-
     return nodes_to_start
-
 
 def generate_launch_description():
     declared_arguments = []

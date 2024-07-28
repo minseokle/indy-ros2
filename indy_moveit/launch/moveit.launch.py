@@ -1,4 +1,5 @@
 # import os
+import time
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.conditions import IfCondition
@@ -69,12 +70,29 @@ def launch_setup(context, *args, **kwargs):
     robot_description_kinematics = PathJoinSubstitution(
         [moveit_config_package, "moveit_config", "kinematics.yaml"]
     )
-    
+
+    if (indy_type.perform(context) == 'indyrp2') or (indy_type.perform(context) == 'indyrp2_v2'):
+        joint_limit_yaml = load_yaml("indy_moveit", "moveit_config/joint_limits_7dof.yaml")
+    else:
+        joint_limit_yaml = load_yaml("indy_moveit", "moveit_config/joint_limits_6dof.yaml")
+    robot_description_planning = {
+        "robot_description_planning": joint_limit_yaml
+    }
+
     ompl_planning_pipeline_config = {
         "move_group": {
-            "planning_plugin": "ompl_interface/OMPLPlanner",
-            "request_adapters": """default_planner_request_adapters/AddTimeOptimalParameterization default_planner_request_adapters/FixWorkspaceBounds default_planner_request_adapters/FixStartStateBounds default_planner_request_adapters/FixStartStateCollision default_planner_request_adapters/FixStartStatePathConstraints""",
-            "start_state_max_bounds_error": 0.5,
+            "planning_plugins": ["ompl_interface/OMPLPlanner"],
+            "request_adapters": [
+                "default_planning_request_adapters/ResolveConstraintFrames",
+                "default_planning_request_adapters/ValidateWorkspaceBounds",
+                "default_planning_request_adapters/CheckStartStateBounds",
+                "default_planning_request_adapters/CheckStartStateCollision",
+            ],
+            "response_adapters": [
+                "default_planning_response_adapters/AddTimeOptimalParameterization",
+                "default_planning_response_adapters/ValidateSolution",
+                "default_planning_response_adapters/DisplayMotionPath",
+            ],
         }
     }
     ompl_planning_yaml = load_yaml("indy_moveit", "moveit_config/ompl_planning.yaml")
@@ -105,8 +123,8 @@ def launch_setup(context, *args, **kwargs):
         "publish_state_updates": True,
         "publish_transforms_updates": True,
     }
-
-    # Start the actual move_group node/action server
+    
+    # Start the actual move_group node/action server  
     move_group_node = Node(
         package="moveit_ros_move_group",
         executable="move_group",
@@ -115,6 +133,7 @@ def launch_setup(context, *args, **kwargs):
             robot_description,
             robot_description_semantic,
             robot_description_kinematics,
+            robot_description_planning,
             ompl_planning_pipeline_config,
             trajectory_execution,
             moveit_controllers,
@@ -126,7 +145,7 @@ def launch_setup(context, *args, **kwargs):
     # rviz with moveit configuration
     if servo_mode.perform(context) == 'true':
         rviz_config_file = PathJoinSubstitution(
-            [moveit_config_package, "rviz_config", "indy_servo.rviz"]
+            [moveit_config_package, "rviz_config", "indy_servo.rviz"] #indy_servo
         )    
     else:
         rviz_config_file = PathJoinSubstitution(
@@ -153,15 +172,17 @@ def launch_setup(context, *args, **kwargs):
     servo_params = {"moveit_servo": servo_yaml}
     servo_node = Node(
         package="moveit_servo",
-        executable="servo_node_main",
+        executable="servo_node",
         parameters=[
             servo_params,
             robot_description,
             robot_description_semantic,
-            robot_description_kinematics
+            robot_description_kinematics,
+            {'use_sim_time': use_sim_time},
         ],
         output="screen",
     )
+
     container = ComposableNodeContainer(
         name="moveit_servo_container",
         namespace="/",
@@ -188,11 +209,8 @@ def launch_setup(context, *args, **kwargs):
 
     if servo_mode.perform(context) == 'true':        
         nodes_to_start = [servo_node, container, rviz_node]
-        # nodes_to_start = [servo_node, rviz_node]
     else:
         nodes_to_start = [move_group_node, rviz_node]
-
-
     return nodes_to_start
 
 

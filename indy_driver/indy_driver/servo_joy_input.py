@@ -5,7 +5,8 @@ from rclpy.node import Node
 from sensor_msgs.msg import Joy
 from geometry_msgs.msg import TwistStamped
 from control_msgs.msg import JointJog
-from std_srvs.srv import Trigger
+# from std_srvs.srv import Trigger
+from moveit_msgs.srv import ServoCommandType 
 
 import signal
 import time
@@ -58,13 +59,13 @@ MAX_SPEED_MUL = 0.5
 class JoyToServoPub(Node):
 
     def __init__(self):
-        super().__init__('joy_to_twist_publisher')
+        super().__init__('servo_joy_input')
 
         # Create a service client to start the ServoNode
-        self.servo_start_client = self.create_client(Trigger, '/servo_node/start_servo')
-        while not self.servo_start_client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info('Service not available, waiting again...')
-        self.servo_start_client.call_async(Trigger.Request())
+        self.servo_client = self.create_client(ServoCommandType, '/servo_node/switch_command_type')
+        while not self.servo_client.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info('servo service not available, waiting again...')
+        self.servo_cmd_type = ServoCommandType.Request()
 
         # parameters
         self.declare_parameter('is_sim', True)
@@ -87,8 +88,10 @@ class JoyToServoPub(Node):
         self.joint_pub = self.create_publisher(JointJog, '/servo_node/delta_joint_cmds', ROS_QUEUE_SIZE)
         
         self.future_callback_waiting = None
+        self.servo_service()
 
         print("TESTED WITH XBOX ONE S CONTROLLER")
+        print("DUE TO LACK OF BUTTON ON XBOX CONTROLLER, THE DEFAULT SERVO MODE WILL BE TWIST")
         print("PLEASE TURN ON TELE MODE BY PRESS 'HOME BUTTON' IF YOU ARE USING WITH REAL ROBOT")
         print("---------For Joint Control---------")
         print("Using Dpad to control joint 1 and joint 2.")
@@ -104,6 +107,20 @@ class JoyToServoPub(Node):
         if not self.isSim:
             self.indy_service(MSG_TELE_STOP)
             time.sleep(0.1)
+
+    def servo_service(self):
+        self.servo_cmd_type.command_type = ServoCommandType.Request.TWIST
+        self.get_logger().info("Switching to input type: Twist")
+        self.servo_service_future = self.servo_client.call_async(self.servo_cmd_type)
+        self.servo_service_future.add_done_callback(self.servo_service_future_callback)
+        
+    def servo_service_future_callback(self, future):
+        try:
+            response = future.result()
+            self.get_logger().info("Switching Done!")
+        except Exception as e:
+            self.get_logger().error('Service call failed %r' % (e,))
+            self.get_logger().info("Could not switch input")
 
     def indy_service(self, data):
         self.indy_req.data = data
@@ -247,7 +264,15 @@ def main(args=None):
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
     
-    rclpy.spin(node)
-
+    # rclpy.spin(node)
+    
+    try:
+        while rclpy.ok():
+            rclpy.spin_once(node, timeout_sec=1.0)  # Adjust the timeout as needed
+    except KeyboardInterrupt:
+        pass
+    finally:
+        signal_handler(signal.SIGINT, None)
+    
 if __name__ == '__main__':
     main()

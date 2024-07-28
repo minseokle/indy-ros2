@@ -1,10 +1,11 @@
 #!/usr/bin/python3
 #-*- coding: utf-8 -*-
+
 # import sys
 import json
 import math
 import time
-from neuromeka import IndyDCP3 
+from neuromeka import IndyDCP3
 
 import rclpy
 from rclpy.node import Node

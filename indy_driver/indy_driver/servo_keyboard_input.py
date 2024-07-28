@@ -4,7 +4,8 @@ import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import TwistStamped
 from control_msgs.msg import JointJog
-from std_srvs.srv import Trigger
+# from std_srvs.srv import Trigger
+from moveit_msgs.srv import ServoCommandType 
 
 import sys
 import termios
@@ -48,6 +49,8 @@ KEYCODE_H           = 0x68
 KEYCODE_Z           = 0x7A
 KEYCODE_Q           = 0x71
 KEYCODE_S           = 0x73
+KEYCODE_J           = 0x6A
+KEYCODE_T           = 0x74
 
 # -----TELE STATUS-----
 TELE_STOP   = 0
@@ -96,12 +99,12 @@ class KeyboardControl(Node):
         self.frame_to_publish = BASE_FRAME_ID
         self.twist_pub = self.create_publisher(TwistStamped, '/servo_node/delta_twist_cmds', ROS_QUEUE_SIZE)
         self.joint_pub = self.create_publisher(JointJog, '/servo_node/delta_joint_cmds', ROS_QUEUE_SIZE)
-
-        # Create a service client to start the ServoNode
-        self.servo_start_client = self.create_client(Trigger, '/servo_node/start_servo')
-        while not self.servo_start_client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info('Service not available, waiting again...')
-        self.servo_start_client.call_async(Trigger.Request())
+        
+        # servo client
+        self.servo_client = self.create_client(ServoCommandType, '/servo_node/switch_command_type')
+        while not self.servo_client.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info('servo service not available, waiting again...')
+        self.servo_cmd_type = ServoCommandType.Request()
 
         # parameters
         self.declare_parameter('is_sim', True)
@@ -117,9 +120,9 @@ class KeyboardControl(Node):
             self.indy_req = IndyService.Request()
 
         # default speed of joint, task
-        self.joint_angular_vel  = 0.5
-        self.task_linear_vel    = 0.5
-        self.task_angular_vel   = 0.5
+        self.joint_angular_vel  = 0.3
+        self.task_linear_vel    = 0.3
+        self.task_angular_vel   = 0.3
 
         self.key = 0x00
         self.teleop_status = TELE_STOP
@@ -128,11 +131,11 @@ class KeyboardControl(Node):
 
     def indy_service(self, data):
         self.indy_req.data = data
-        self.future = self.cli.call_async(self.indy_req)
-        while not self.future.done():
+        future = self.cli.call_async(self.indy_req)
+        while not future.done():
             time.sleep(0.01)
         try:
-            response = self.future.result()
+            response = future.result()
         except Exception as e:
             self.get_logger().error('Service call failed %r' % (e,))
         return response
@@ -154,6 +157,18 @@ class KeyboardControl(Node):
         else:
             return False
 
+    def servo_service(self):
+        future = self.servo_client.call_async(self.servo_cmd_type)
+        while not future.done():
+            time.sleep(0.01)
+        try:
+            response = future.result()
+            self.get_logger().info("Switching Done!")
+        except Exception as e:
+            self.get_logger().error('Service call failed %r' % (e,))
+            self.get_logger().info("Could not switch input")
+        return response
+
     def key_loop(self):
         threading.Thread(target=lambda: rclpy.spin(self)).start()
 
@@ -163,6 +178,8 @@ class KeyboardControl(Node):
         print("Use 'W' to Cartesian jog in the world frame, and 'E' for the End-Effector frame")
         print("Use 'N' 'M' ',' for the Task move UVW")
         print("Use 1|2|3|4|5|6|7 keys to joint jog. 'R' to reverse the direction of jogging.")
+        print("Use 'J' to select joint jog")
+        print("Use 'T' to select twist")
         print("Use '-' '+' to adjust joint speed")
         print("Use '9' '0' to adjust task speed")
         print("'Q' to quit.")
@@ -209,6 +226,17 @@ class KeyboardControl(Node):
                     self.get_logger().info('Exit Servo Keyboard!')
                     break
 
+                # -------------------------
+                elif self.key == chr(KEYCODE_J):
+                    self.servo_cmd_type.command_type = ServoCommandType.Request.JOINT_JOG
+                    self.get_logger().info("Switching to input type: JointJog")
+                    self.servo_service()
+                
+                elif self.key == chr(KEYCODE_T):
+                    self.servo_cmd_type.command_type = ServoCommandType.Request.TWIST
+                    self.get_logger().info("Switching to input type: Twist")
+                    self.servo_service()
+                
                 # -------------------------
                 elif self.key == chr(KEYCODE_LEFT):
                     if self.isValid():
