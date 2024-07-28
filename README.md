@@ -14,9 +14,9 @@ This repository contains ROS2 drivers for Indy7, Indy7V2, IndyRP2, IndyRP2V2 and
 
 The following software needs to be installed:
 - [ROS2 Humble](https://docs.ros.org/en/humble/Installation.html)
-- indyDCP3
+- [Neuromeka Package](https://github.com/neuromeka-robotics/neuromeka-package)
     ```
-    pip3 install neuromeka==3.2.0.3
+    pip3 install neuromeka
     ```
 
 ## Installation
@@ -68,7 +68,7 @@ export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 
 ```
 git clone <this repository url>
-cd ~/indy_ros2/
+cd ~/indy-ros2/
 colcon build
 ```
 
