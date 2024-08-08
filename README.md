@@ -17,6 +17,7 @@ The following software needs to be installed:
 - [Neuromeka Package](https://github.com/neuromeka-robotics/neuromeka-package)
     ```
     pip3 install neuromeka
+    pip3 install --upgrade neuromeka
     ```
 
 ## Installation
@@ -64,10 +65,20 @@ Add this to ~/.bashrc to source it automatically
 export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 ```
 
-### Download the source code and build
+### Create workspace
+
+Create workspace and download the source code
 
 ```
+cd
+mkdir -p indy-ros2/src
+cd ~/indy-ros2/src
 git clone <this repository url>
+```
+
+Build the source code
+
+```
 cd ~/indy-ros2/
 colcon build
 ```
@@ -174,3 +185,45 @@ ros2 run indy_driver servo_keyboard_input.py --ros-args -p is_sim:=false
 ```
 ros2 run indy_driver servo_joy_input.py --ros-args -p is_sim:=false
 ```
+
+
+## Docker Setup Instructions for ROS2 Humble
+
+### Install Docker
+If Docker is not installed on your system, follow these steps:
+```
+sudo apt update \
+&& sudo apt install -y docker.io \
+&& sudo systemctl start docker \
+&& sudo systemctl enable docker
+```
+Navigate to the Dockerfile Directory
+```
+cd ~/indy-ros2/docker
+```
+Build the Docker Image
+```
+sudo docker build -t ros2_humble_neuromeka:humble-indyDCP3 .
+```
+Verify the docker Image, if docker is successfully updated, you can find the docker image.
+```
+sudo docker images
+```
+
+Prepare for GUI Applications (Rviz, Gazebo) using your monitor:
+```
+xhost +local:docker
+```
+Create and start a Docker container named ros2_humble_neuromeka_container, enabling GUI support:
+```
+sudo docker run -it --name \
+ros2_humble_neuromeka_container \
+-e DISPLAY=$DISPLAY \
+-v /tmp/.X11-unix:/tmp/.X11-unix \
+ros2_humble_neuromeka:humble-indyDCP3
+```
+Access the Docker Container in Another Terminal
+```
+sudo docker exec -it ros2_humble_neuromeka_container bash
+```
+Your Docker environment is now configured.
