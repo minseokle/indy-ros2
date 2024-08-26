@@ -174,19 +174,37 @@
 
         <xacro:if value="${indy_type == 'indyrp2' or indy_type == 'indyrp2_v2'}">
             <xacro:define_joint joint_index="joint6" link_1_index="link6" link_2_index="link7"/>
+            <xacro:property name="config_kinematics_parameters" value="${xacro.load_yaml(kinematics_parameters_file)}"/>
+            <xacro:property name="sec_kinematics" value="${config_kinematics_parameters['kinematics']}" />
             <joint name="${prefix}tcp" type="fixed">
                 <parent link="${prefix}link7"/>
                 <child link="${prefix}tcp"/>
-                <origin xyz="0 0 0.06" rpy="0 0 0"/>
-            </joint>   
+                <!-- <origin xyz="0 0 0.06" rpy="0 0 0"/> -->
+                <origin
+                    xyz="${sec_kinematics['tcp']['x']} 
+                        ${sec_kinematics['tcp']['y']} 
+                        ${sec_kinematics['tcp']['z']}" 
+                    rpy="${sec_kinematics['tcp']['roll']}
+                        ${sec_kinematics['tcp']['pitch']}
+                        ${sec_kinematics['tcp']['yaw']}"/>
+            </joint>
         </xacro:if>
 
         <xacro:unless value="${indy_type == 'indyrp2' or indy_type == 'indyrp2_v2'}">
+            <xacro:property name="config_kinematics_parameters" value="${xacro.load_yaml(kinematics_parameters_file)}"/>
+            <xacro:property name="sec_kinematics" value="${config_kinematics_parameters['kinematics']}" />
             <joint name="${prefix}tcp" type="fixed">
                 <parent link="${prefix}link6"/>
                 <child link="${prefix}tcp"/>
-                <origin xyz="0 0 0.06" rpy="0 0 0"/>
-            </joint>    
+                <!-- <origin xyz="0 0 0.06" rpy="0 0 0"/> -->
+                <origin
+                    xyz="${sec_kinematics['tcp']['x']} 
+                        ${sec_kinematics['tcp']['y']} 
+                        ${sec_kinematics['tcp']['z']}" 
+                    rpy="${sec_kinematics['tcp']['roll']}
+                        ${sec_kinematics['tcp']['pitch']}
+                        ${sec_kinematics['tcp']['yaw']}"/>
+            </joint>
         </xacro:unless>
 
         <!-- ros2 control -->
