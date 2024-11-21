@@ -21,7 +21,7 @@ def construct_angle_degrees(loader, node):
     return math.radians(construct_angle_radians(loader, node))
 
 
-def load_yaml(package_name, file_path):
+def load_yaml_indy(package_name, file_path):
     package_path = get_package_share_directory(package_name)
     absolute_file_path = os.path.join(package_path, file_path)
     return load_yaml_abs(absolute_file_path)

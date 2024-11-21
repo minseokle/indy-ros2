@@ -17,7 +17,7 @@
     </xacro:macro>
 
     <xacro:macro name="define_initialize" params="visual_parameters_file">
-        <xacro:property name="config_visual_parameters" value="${load_yaml(visual_parameters_file)}"/>
+        <xacro:property name="config_visual_parameters" value="${xacro.load_yaml(visual_parameters_file)}"/>
         <xacro:property name="sec_mesh_files" value="${config_visual_parameters['mesh_files']}" scope="parent"/>
     </xacro:macro>
 

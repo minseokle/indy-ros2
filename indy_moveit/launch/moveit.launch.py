@@ -5,7 +5,7 @@ from launch.conditions import IfCondition
 from launch.substitutions import Command, FindExecutable, LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
-from indy_moveit.launch_common import load_yaml
+from indy_moveit.launch_common import load_yaml_indy
 from launch_ros.descriptions import ComposableNode
 from launch_ros.actions import Node, ComposableNodeContainer
 
@@ -77,14 +77,14 @@ def launch_setup(context, *args, **kwargs):
             "start_state_max_bounds_error": 0.5,
         }
     }
-    ompl_planning_yaml = load_yaml("indy_moveit", "moveit_config/ompl_planning.yaml")
+    ompl_planning_yaml = load_yaml_indy("indy_moveit", "moveit_config/ompl_planning.yaml")
     ompl_planning_pipeline_config["move_group"].update(ompl_planning_yaml)
 
     # Trajectory Execution Configuration
     if (indy_type.perform(context) == 'indyrp2') or (indy_type.perform(context) == 'indyrp2_v2'):
-        controllers_yaml = load_yaml("indy_moveit", "moveit_config/controllers_7dof.yaml")
+        controllers_yaml = load_yaml_indy("indy_moveit", "moveit_config/controllers_7dof.yaml")
     else:
-        controllers_yaml = load_yaml("indy_moveit", "moveit_config/controllers_6dof.yaml")
+        controllers_yaml = load_yaml_indy("indy_moveit", "moveit_config/controllers_6dof.yaml")
 
     moveit_controllers = {
         "moveit_simple_controller_manager": controllers_yaml,
@@ -148,7 +148,7 @@ def launch_setup(context, *args, **kwargs):
     )
 
     # Servo node for realtime control
-    servo_yaml = load_yaml("indy_moveit", "moveit_config/indy_servo.yaml")
+    servo_yaml = load_yaml_indy("indy_moveit", "moveit_config/indy_servo.yaml")
     servo_params = {"moveit_servo": servo_yaml}
     container = ComposableNodeContainer(
         name="moveit_servo_container",

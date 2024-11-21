@@ -20,9 +20,10 @@ from sensor_msgs.msg import JointState
 from trajectory_msgs.msg import JointTrajectoryPoint, JointTrajectory
 from control_msgs.action import FollowJointTrajectory
 
-from indy_utils import indydcp_client
-from indy_utils import indy_program_maker
-from indy_utils import utils_transf
+
+import indydcp_client
+import indy_program_maker
+import utils_transf
 
 
 class IndyROSConnector(Node):

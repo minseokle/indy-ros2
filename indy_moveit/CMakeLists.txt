@@ -39,7 +39,7 @@ install(DIRECTORY
 )
 
 add_library(${SERVO_CONTROLLER_INPUT} SHARED src/servo_joy_input.cpp)
-ament_target_dependencies(${SERVO_CONTROLLER_INPUT} rclcpp geometry_msgs control_msgs sensor_msgs moveit_msgs std_srvs)
+ament_target_dependencies(${SERVO_CONTROLLER_INPUT} rclcpp rclcpp_components geometry_msgs control_msgs sensor_msgs moveit_msgs std_srvs)
 rclcpp_components_register_nodes(${SERVO_CONTROLLER_INPUT} "moveit_servo::JoyToServoPub")
 
 add_executable(servo_keyboard_input src/servo_keyboard_input.cpp)
